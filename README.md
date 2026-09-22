@@ -150,20 +150,7 @@ index.html
 
 ---
 
-## 9. Technology Stack
-
-| Technology     | Purpose                            |
-| -------------- | ---------------------------------- |
-| HTML5          | Interface and structure            |
-| Tailwind CSS   | Styling                            |
-| JavaScript     | Experiment logic and data analysis |
-| Chart.js       | Results visualization              |
-| Font Awesome 6 | Icons                              |
-| Web Audio API  | Audio feedback                     |
-
----
-
-## 10. Demo
+## 9. Demo
 
 **Live Demo:** `<your-github-pages-url>`
 
