@@ -112,14 +112,35 @@ This provides participants with advance visual information and allows them to pr
 
 ## 6. Results
 
-The results dashboard provides:
+### Empirical Regression Model
+Based on the empirical dataset from 44 valid trial acquisitions (excluding practice trials), the derived Fitts' Law motor-control model is:
 
-* Movement Time vs. ID regression plot
-* R² value
-* Throughput
-* Error information
-* Step-level performance
-* CSV data export
+$$MT = 207.1 + 137.2 \times ID$$
+
+* **Regression Score ($R^2$):** $0.520$
+* **Mean Throughput ($TP$):** $5.18\text{ bits/s}$
+* **Total Misses / Error Rate:** $1\text{ miss } (1.8\%)$
+
+---
+
+### Step-Level Performance Summary
+
+| Stage | Task | Mean ID | Mean MT | Misses |
+| :--- | :--- | :--- | :--- | :--- |
+| **Step 1** | 搶票區 (Lock Ticket) | $3.23\text{ bits}$ | $608\text{ ms}$ | $0$ |
+| **Step 2** | 選位區 (Select Seat) | $4.35\text{ bits}$ | $806\text{ ms}$ | $1$ |
+| **Step 3** | 付款區 (Confirm Payment) | $3.18\text{ bits}$ | $683\text{ ms}$ | $0$ |
+
+---
+
+### Regression Analysis & Plot
+
+![Fitts' Law Regression Analysis](fitts_law_results.jpg)
+
+#### Parameter Interpretation:
+* **Intercept ($a = 207.1\text{ ms}$):** Represents the baseline cognitive preparation time and raw clicking latency before physical cursor movement begins under a high-pressure booking scenario.
+* **Slope ($b = 137.2\text{ ms/bit}$):** Represents the inverse of human motor processing rate. For every $1\text{ bit}$ increase in index of difficulty ($ID$), movement time increases by approximately $137.2\text{ ms}$.
+* **Analysis:** **Step 2 (Select Seat)** presented the highest difficulty ($\text{Mean ID} = 4.35\text{ bits}$) and longest movement time ($\text{Mean MT} = 806\text{ ms}$), accounting for the only selection error ($1.8\%$). This aligns with Fitts' Law predictions, proving that smaller/densely packed targets in seat selection require higher motor precision and visual verification.
 
 ---
 
