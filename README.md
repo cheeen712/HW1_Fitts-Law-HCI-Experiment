@@ -148,6 +148,13 @@ Then open:
 index.html
 ```
 
+## 8. Getting Started
+
+Clone the repository and open `index.html` in a modern web browser. No backend server is required.
+
+```bash
+git clone [https://github.com/cheeen712/HW1_Fitts-Law-HCI-Experiment.git](https://github.com/cheeen712/HW1_Fitts-Law-HCI-Experiment.git)
+cd HW1_Fitts-Law-HCI-Experiment
 ---
 
 ## 9. Demo
