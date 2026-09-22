@@ -135,12 +135,12 @@ $$MT = 207.1 + 137.2 \times ID$$
 
 ### Regression Analysis & Plot
 
-![Fitts' Law Regression Analysis](fitts_law_results.jpg)
+<img width="818" height="707" alt="截圖 2026-09-22 晚上11 09 53" src="https://github.com/user-attachments/assets/7a073cbd-bdb1-4e6b-8fda-1c92a5753c01" />
 
 #### Parameter Interpretation:
 * **Intercept ($a = 207.1\text{ ms}$):** Represents the baseline cognitive preparation time and raw clicking latency before physical cursor movement begins under a high-pressure booking scenario.
 * **Slope ($b = 137.2\text{ ms/bit}$):** Represents the inverse of human motor processing rate. For every $1\text{ bit}$ increase in index of difficulty ($ID$), movement time increases by approximately $137.2\text{ ms}$.
-* **Analysis:** **Step 2 (Select Seat)** presented the highest difficulty ($\text{Mean ID} = 4.35\text{ bits}$) and longest movement time ($\text{Mean MT} = 806\text{ ms}$), accounting for the only selection error ($1.8\%$). This aligns with Fitts' Law predictions, proving that smaller/densely packed targets in seat selection require higher motor precision and visual verification.
+* **Analysis:** **Step 2 (Select Seat)** presented the highest difficulty ($\text{Mean ID} = 4.35\text{ bits}$) and longest movement time ($\text{Mean MT} = 806\text{ ms}$), accounting for the only selection error ($1.8\%$). This aligns with Fitts' Law predictions,indicating that smaller/densely packed targets in seat selection require higher motor precision and visual verification.
 
 ---
 
