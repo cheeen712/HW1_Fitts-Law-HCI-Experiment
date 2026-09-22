@@ -149,6 +149,6 @@ index.html
 
 ## 9. Demo
 
-* **Live Demo:** [https://cheeen712.github.io/HW1_Fitts-Law-HCI-Experiment/](https://cheeen712.github.io/HW1_Fitts-Law-HCI-Experiment/)
+* **Live Demo:** [Demo網頁連結](https://cheeen712.github.io/HW1_Fitts-Law-HCI-Experiment/)
 
-* **Video:** <貼上你錄製的操作影片連結，例如 YouTube 或 Google Drive>
+* **Video:** [Demo影片](https://youtu.be/OCyX2UmX304)
