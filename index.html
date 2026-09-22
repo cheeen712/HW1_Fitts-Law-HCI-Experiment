@@ -1,1011 +1,885 @@
 <!DOCTYPE html>
-<html lang="zh-TW" class="dark">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>急診室醫療平板介面 - 費茨法則 (Fitts' Law) 實驗系統</title>
+    <title>Fitts' Law HCI Experiment - Concert Booking Dashboard</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        medical: {
-                            bg: '#090d16',
-                            panel: '#0f172a',
-                            card: '#1e293b',
-                            border: '#334155',
-                            accent: '#38bdf8',
-                            danger: '#ef4444',
-                            warning: '#f59e0b',
-                            success: '#10b981'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @keyframes pulse-border {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0B0E14;
+            color: #E2E8F0;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        @keyframes pulse-start {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            50% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
+
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
         }
-        .animate-pulse-start {
-            animation: pulse-start 2s infinite;
+
+        /* 靜態標靶點擊區：嚴格維護 100% 靜態幾何尺寸 */
+        .static-target {
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+            cursor: pointer;
         }
-        .animate-pulse-danger {
-            animation: pulse-border 1.5s infinite;
-        }
-        .arena-grid {
-            background-image: radial-gradient(rgba(51, 65, 85, 0.4) 1px, transparent 1px);
-            background-size: 24px 24px;
-        }
-        /* Custom scrollbar for data tables */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
+
+        /* 自訂光暈 */
+        .glow-pink { box-shadow: 0 0 15px rgba(255, 42, 109, 0.6); }
+        .glow-cyan { box-shadow: 0 0 15px rgba(5, 213, 228, 0.6); }
+        .glow-mint { box-shadow: 0 0 15px rgba(0, 245, 212, 0.6); }
+        .glow-yellow { box-shadow: 0 0 15px rgba(255, 190, 11, 0.7); }
+
+        /* 客製化滾動條 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4B5563; }
     </style>
 </head>
-<body class="bg-medical-bg text-slate-100 font-sans min-h-screen flex flex-col select-none overflow-x-hidden">
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden text-sm">
 
-    <!-- Toast Notification Container -->
-    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 right-5 z-50 bg-gray-800 text-white px-4 py-3 rounded-lg shadow-2xl border border-gray-700 transition-all duration-300 opacity-0 pointer-events-none transform translate-y-2 flex items-center space-x-2">
+        <i class="fa-solid fa-circle-info text-cyan-400"></i>
+        <span id="toastText" class="code-font text-xs">通知訊息</span>
+    </div>
 
-    <!-- Top Medical Dashboard Header -->
-    <header class="bg-medical-panel border-b border-medical-border px-4 py-3 sticky top-0 z-30 shadow-lg">
-        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-            
-            <!-- System Branding -->
-            <div class="flex items-center space-x-3">
-                <div class="p-2 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center text-medical-accent">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="text-lg font-bold tracking-wide text-slate-100">ER-MED PAD v3.2</h1>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-800">
-                            <span class="w-2 h-2 mr-1 rounded-full bg-emerald-400 animate-ping"></span>
-                            ONLINE
-                        </span>
-                    </div>
-                    <p class="text-xs text-slate-400">急診室醫療平板人機介面 (HCI) 費茨法则點擊效能測試</p>
-                </div>
+    <!-- Header / Navigation Bar -->
+    <header class="border-b border-gray-800 bg-[#0F131C] px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 via-cyan-400 to-mint-400 flex items-center justify-center text-slate-950 font-black text-lg">
+                <i class="fa-solid fa-ticket"></i>
             </div>
-
-            <!-- Global Experiment Status & Controls -->
-            <div class="flex items-center flex-wrap gap-4">
-                
-                <!-- Subject ID Input -->
-                <div class="flex items-center bg-medical-card px-3 py-1.5 rounded-lg border border-medical-border">
-                    <label for="subjectIdInput" class="text-xs text-slate-400 mr-2 font-mono">受試者編號:</label>
-                    <input type="text" id="subjectIdInput" value="P-001" class="bg-slate-900 text-medical-accent text-sm font-mono font-bold px-2 py-1 rounded border border-slate-700 w-20 focus:outline-none focus:border-medical-accent">
-                </div>
-
-                <!-- Trial Counter Badge -->
-                <div class="flex items-center bg-medical-card px-3 py-1.5 rounded-lg border border-medical-border">
-                    <span class="text-xs text-slate-400 mr-2">進度:</span>
-                    <span id="trialCounterText" class="text-sm font-mono font-bold text-slate-200">0 / 24</span>
-                </div>
-
-                <!-- Sound Toggle Button -->
-                <button id="soundToggleBtn" onclick="toggleSound()" class="p-2 bg-medical-card border border-medical-border hover:bg-slate-700 rounded-lg text-slate-300 transition-colors flex items-center justify-center" title="切換音效">
-                    <svg id="soundIconOn" class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
-                    </svg>
-                    <svg id="soundIconOff" class="w-5 h-5 text-slate-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
-                    </svg>
-                </button>
-
-                <!-- Reset Button -->
-                <button onclick="resetExperiment()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg text-xs font-medium transition duration-150 flex items-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    重置實驗
-                </button>
+            <div>
+                <h1 class="font-bold text-base text-gray-100 tracking-wide flex items-center gap-2">
+                    一站式演唱會搶票系統
+                    <span class="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-normal code-font">ISO 9241-9 Rigorous Test</span>
+                </h1>
+                <p class="text-xs text-gray-400">費茨法則 (Fitts' Law) 人機互動實驗平台</p>
             </div>
         </div>
 
-        <!-- Progress Bar -->
-        <div class="w-full bg-slate-900 h-1.5 mt-3 rounded-full overflow-hidden border border-slate-800">
-            <div id="trialProgressBar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-full w-0 transition-all duration-300"></div>
+        <!-- System Controls & Indicators -->
+        <div class="flex items-center space-x-6">
+            <div class="flex items-center space-x-4 bg-[#161B26] px-4 py-1.5 rounded-lg border border-gray-800">
+                <div class="text-center">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">目前階段</div>
+                    <div id="phaseIndicator" class="font-bold code-font text-yellow-400">準備中</div>
+                </div>
+                <div class="w-px h-6 bg-gray-700"></div>
+                <div class="text-center">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Trial 進度</div>
+                    <div id="trialProgress" class="font-bold code-font text-cyan-400">0 / 15</div>
+                </div>
+                <div class="w-px h-6 bg-gray-700"></div>
+                <div class="text-center">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">點擊錯誤率</div>
+                    <div id="errorRateDisplay" class="font-bold code-font text-rose-400">0.0%</div>
+                </div>
+            </div>
+
+            <button id="resetBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium border border-gray-700 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-left"></i> 重置實驗
+            </button>
         </div>
     </header>
 
-    <!-- Main Container -->
-    <main class="max-w-7xl mx-auto w-full p-4 flex-1 flex flex-col gap-4">
+    <!-- Main Experiment Canvas Dashboard -->
+    <main class="flex-1 flex flex-col items-center justify-center p-4">
         
-        <!-- Quick Stats & Legend Panel -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            
-            <!-- Realtime Metrics Cards -->
-            <div class="bg-medical-panel border border-medical-border rounded-xl p-3 flex items-center justify-between">
-                <div>
-                    <div class="text-xs text-slate-400">平均移動時間 (MT)</div>
-                    <div id="liveAvgMT" class="text-xl font-mono font-bold text-medical-accent">-- ms</div>
-                </div>
-                <div class="text-slate-600">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-            </div>
-
-            <div class="bg-medical-panel border border-medical-border rounded-xl p-3 flex items-center justify-between">
-                <div>
-                    <div class="text-xs text-slate-400">點擊準確率 (Accuracy)</div>
-                    <div id="liveAccuracy" class="text-xl font-mono font-bold text-emerald-400">-- %</div>
-                </div>
-                <div class="text-slate-600">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-            </div>
-
-            <div class="bg-medical-panel border border-medical-border rounded-xl p-3 flex items-center justify-between">
-                <div>
-                    <div class="text-xs text-slate-400">總誤擊次數 (Misses)</div>
-                    <div id="liveTotalErrors" class="text-xl font-mono font-bold text-rose-400">0 次</div>
-                </div>
-                <div class="text-slate-600">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                </div>
-            </div>
-
-            <!-- Target Types Legend -->
-            <div class="bg-medical-panel border border-medical-border rounded-xl p-3 flex items-center justify-around text-xs">
-                <div class="flex items-center gap-1.5" title="寬度 W = 24px (高難度 / 高 ID)">
-                    <span class="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
-                    <span class="text-slate-300">高風險藥物確認</span>
-                </div>
-                <div class="flex items-center gap-1.5" title="寬度 W = 48px (中難度)">
-                    <span class="w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
-                    <span class="text-slate-300">生理數據</span>
-                </div>
-                <div class="flex items-center gap-1.5" title="寬度 W = 88px (低難度 / 低 ID)">
-                    <span class="w-4 h-4 rounded-full bg-red-500 shadow-sm shadow-red-500/50"></span>
-                    <span class="text-slate-300">緊急 CPR 警報</span>
-                </div>
-            </div>
-
+        <!-- Practice Notice Banner -->
+        <div id="practiceBanner" class="hidden w-[1020px] mb-2 bg-yellow-950/40 border border-yellow-700/60 rounded-lg px-4 py-2 flex items-center justify-between text-yellow-300 text-xs">
+            <span class="flex items-center gap-2">
+                <i class="fa-solid fa-vial"></i> 
+                <b>練習階段（Practice Block）：</b> 目前進行的是練習測試（3 輪），數據不會納入正式統計分析。
+            </span>
+            <span class="code-font bg-yellow-900/80 px-2 py-0.5 rounded text-[11px]">練習中</span>
         </div>
 
-        <!-- Testing Canvas / Arena -->
-        <div id="arenaContainer" class="relative w-full h-[560px] bg-slate-950 rounded-2xl border border-medical-border shadow-2xl overflow-hidden arena-grid flex flex-col justify-between p-4 cursor-crosshair">
+        <!-- Dashboard Frame (1020px x 610px static canvas) -->
+        <div id="dashboardFrame" class="relative w-[1020px] h-[610px] bg-[#111622] rounded-xl border border-gray-800 shadow-2xl overflow-hidden flex flex-col select-none">
             
-            <!-- Arena Status & Guidance Header -->
-            <div class="z-10 flex items-center justify-between pointer-events-none">
-                <div class="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800">
-                    <span id="arenaStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
-                    <span id="arenaStatusText" class="text-xs font-mono text-slate-300">請點擊「開始實驗」以啟動測試</span>
+            <!-- Dashboard UI Header -->
+            <div class="bg-[#181F2E] px-5 py-3 border-b border-gray-800 flex justify-between items-center z-10 pointer-events-none">
+                <div class="flex items-center space-x-3">
+                    <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                    <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                    <span class="text-xs text-gray-400 ml-2 font-mono">TICKET_HUB_STUDIO // Live Booking Dashboard</span>
                 </div>
-                <div id="currentTrialInfo" class="hidden bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono text-slate-400">
-                    距離 (A): <span id="infoDist" class="text-cyan-400 font-bold">--</span> px | 
-                    目標寬度 (W): <span id="infoWidth" class="text-amber-400 font-bold">--</span> px | 
-                    難度 (ID): <span id="infoID" class="text-purple-400 font-bold">--</span> bits
+                <div class="text-xs text-gray-400 code-font flex gap-4">
+                    <span>STATUS: <span class="text-emerald-400 font-semibold">ONLINE</span></span>
+                    <span>LATENCY: <span class="text-cyan-400 font-semibold">12ms</span></span>
                 </div>
             </div>
 
-            <!-- Welcome / Start Overlay Screen -->
-            <div id="welcomeOverlay" class="absolute inset-0 z-20 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                <div class="w-16 h-16 bg-medical-card border border-medical-accent rounded-2xl flex items-center justify-center text-medical-accent mb-4 shadow-lg shadow-cyan-500/10">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
-                    </svg>
-                </div>
-                <h2 class="text-2xl font-bold text-slate-100 mb-2">急診室醫療平板觸控點擊測試 (Fitts' Law)</h2>
-                <p class="max-w-xl text-sm text-slate-400 mb-6 leading-relaxed">
-                    本實驗模擬醫療人員在急診室平板介面上點擊不同按鈕的情境。<br>
-                    共包含 <strong class="text-slate-200">24 次試驗</strong>。每次試驗請先點擊中央綠色<strong class="text-emerald-400">「起始導引點」</strong>，再以<strong class="text-cyan-400">最快速度且精確地點擊</strong>出現的醫療目標按鈕。
-                </p>
-                
-                <div class="grid grid-cols-3 gap-4 mb-8 w-full max-w-md text-xs">
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center">
-                        <span class="text-amber-400 font-bold mb-1">小目標 (24px)</span>
-                        <span class="text-slate-400">高風險藥物確認</span>
+            <!-- Dashboard Content Layout (3 Zones) -->
+            <div class="flex-1 grid grid-cols-12 gap-4 p-5 relative z-10 pointer-events-none">
+                <!-- Zone 1: Booking Zone -->
+                <div class="col-span-4 bg-[#161D2C]/60 rounded-lg border border-gray-800/80 p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
+                            <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-bolt text-rose-400"></i> 1. 搶票區
+                            </span>
+                            <span class="text-[10px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded code-font">Zone A</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-2">極速點擊鎖定票種與張數。</p>
                     </div>
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center">
-                        <span class="text-cyan-400 font-bold mb-1">中目標 (48px)</span>
-                        <span class="text-slate-400">生理數據同步</span>
-                    </div>
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center">
-                        <span class="text-rose-400 font-bold mb-1">大目標 (88px)</span>
-                        <span class="text-slate-400">一鍵緊急警報</span>
+                    <div class="bg-gray-900/50 p-3 rounded border border-gray-800/50 space-y-2">
+                        <div class="h-2 bg-gray-800 rounded w-3/4"></div>
+                        <div class="h-2 bg-gray-800 rounded w-1/2"></div>
                     </div>
                 </div>
 
-                <button onclick="startExperiment()" class="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl shadow-lg shadow-cyan-500/25 transition transform active:scale-95 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    開始實驗
-                </button>
+                <!-- Zone 2: Seat Map Zone -->
+                <div class="col-span-5 bg-[#161D2C]/60 rounded-lg border border-gray-800/80 p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
+                            <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-chair text-cyan-400"></i> 2. 座位選擇區
+                            </span>
+                            <span class="text-[10px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded code-font">Zone B</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-2">於視聽網格地圖中點擊指定目標座位。</p>
+                    </div>
+                    <div class="h-44 bg-[#0F1420] rounded border border-gray-800/70 p-3 grid grid-cols-8 gap-2 items-center justify-center opacity-30">
+                        <div class="w-full h-3 bg-gray-700/50 rounded-sm"></div><div class="w-full h-3 bg-gray-700/50 rounded-sm"></div>
+                        <div class="w-full h-3 bg-gray-700/50 rounded-sm"></div><div class="w-full h-3 bg-gray-700/50 rounded-sm"></div>
+                        <div class="w-full h-3 bg-gray-700/50 rounded-sm"></div><div class="w-full h-3 bg-gray-700/50 rounded-sm"></div>
+                        <div class="w-full h-3 bg-gray-700/50 rounded-sm"></div><div class="w-full h-3 bg-gray-700/50 rounded-sm"></div>
+                        <div class="w-full h-3 bg-gray-700/50 rounded-sm"></div><div class="w-full h-3 bg-gray-700/50 rounded-sm"></div>
+                        <div class="w-full h-3 bg-gray-700/50 rounded-sm"></div><div class="w-full h-3 bg-gray-700/50 rounded-sm"></div>
+                    </div>
+                </div>
+
+                <!-- Zone 3: Payment Zone -->
+                <div class="col-span-3 bg-[#161D2C]/60 rounded-lg border border-gray-800/80 p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
+                            <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-credit-card text-emerald-400"></i> 3. 付款確認區
+                            </span>
+                            <span class="text-[10px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded code-font">Zone C</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-2">確認訂購明細並進行結帳驗證。</p>
+                    </div>
+                    <div class="space-y-2 bg-gray-900/50 p-3 rounded border border-gray-800/50">
+                        <div class="flex justify-between text-[11px] text-gray-400">
+                            <span>票價小計</span>
+                            <span class="code-font text-gray-300">$3,800</span>
+                        </div>
+                        <div class="flex justify-between text-[11px] text-gray-400">
+                            <span>手續費</span>
+                            <span class="code-font text-gray-300">$80</span>
+                        </div>
+                        <div class="h-px bg-gray-800"></div>
+                        <div class="h-2 bg-emerald-950 rounded w-full"></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Dynamic Interactive Elements Container -->
-            <div id="interactiveLayer" class="absolute inset-0 pointer-events-auto">
-                <!-- Start Point and Target Elements will be dynamically rendered here -->
-            </div>
+            <!-- Absolute Interactive Layer -->
+            <div id="interactiveLayer" class="absolute inset-0 pointer-events-auto z-20"></div>
 
-            <!-- Arena Bottom Status Indicator -->
-            <div class="z-10 flex items-center justify-between pointer-events-none text-xs text-slate-500 font-mono">
-                <span>CANVAS RESOLUTION: AUTOMATIC</span>
-                <span>HCI EXPERIMENT METHODOLOGY: SHANNON FORMULATION</span>
+            <!-- Overlay Start Prompt Screen -->
+            <div id="welcomeOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-30 flex flex-col items-center justify-center p-8 text-center">
+                <div class="max-w-xl space-y-5">
+                    <div class="inline-flex p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 mb-1">
+                        <i class="fa-solid fa-vial-circle-check text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white tracking-wide">演唱會搶票系統 HCI 實驗</h2>
+                    <p class="text-sm text-gray-300 leading-relaxed text-left bg-gray-900/80 p-4 rounded-lg border border-gray-800">
+                        本實驗評估介面點擊目標的運動時間（MT），已套用 <b>Welford 夾角寬度修正</b> 與 <b>預警高亮機制</b> 以確保高度線性擬合。<br><br>
+                        1. 先進行 <span class="text-yellow-400 font-semibold">練習階段</span> 熟悉流程 (3 輪)。<br>
+                        2. 先移動眼球確認預告目標位置，再點擊 <span class="text-yellow-400 font-semibold">START ANCHOR</span> 起始點。<br>
+                        3. 依亮起提示，快速且精準點擊：<br>
+                        &nbsp;&nbsp;&nbsp;• <b>1. 搶票區目標</b> &rarr; <b>2. 座位區目標</b> &rarr; <b>3. 付款區目標</b>。<br>
+                        4. 完成 15 輪正式實驗後可檢視 $R^2$ 迴歸圖與下載 CSV 完整資料。
+                    </p>
+
+                    <div class="pt-2 flex justify-center gap-4">
+                        <button id="startExperimentBtn" class="bg-gradient-to-r from-pink-500 via-cyan-500 to-emerald-500 hover:opacity-90 text-slate-950 font-bold px-8 py-3 rounded-lg shadow-lg text-base transition transform active:scale-95 flex items-center gap-2">
+                            <i class="fa-solid fa-play"></i> 開始實驗 (含練習 round)
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- Instruction Status Bar -->
+        <div id="instructionBar" class="w-[1020px] mt-3 bg-[#131924] border border-gray-800 rounded-lg px-5 py-2.5 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                <span id="statusText" class="text-xs font-medium text-gray-300">請點擊「開始實驗」以啟動測試</span>
+            </div>
+            <div id="liveMetrics" class="text-xs code-font text-gray-400 flex items-center space-x-4">
+                <span>Distance A: <span id="lastDistanceText" class="text-cyan-400">-</span></span>
+                <span>Width W': <span id="lastWidthText" class="text-pink-400">-</span></span>
+                <span>ID: <span id="lastIDText" class="text-emerald-400">-</span></span>
+            </div>
+        </div>
     </main>
 
-    <!-- Results & Statistical Analysis Modal (Hidden by default) -->
-    <div id="resultsModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg flex items-center justify-center p-4 overflow-y-auto hidden">
-        <div class="bg-medical-panel border border-medical-border rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col my-auto">
+    <!-- Modal: Results & Analytics Summary -->
+    <div id="resultsModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-[#111622] border border-gray-800 w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             
-            <!-- Modal Header -->
-            <div class="p-5 border-b border-medical-border flex items-center justify-between sticky top-0 bg-medical-panel z-10">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-xl">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-slate-100">實驗完成！費茨法則 (Fitts' Law) 統計數據報告</h2>
-                        <p class="text-xs text-slate-400">受試者編號: <span id="resSubjectId" class="text-cyan-400 font-mono font-bold">P-001</span> | 完成試驗: 24 / 24</p>
-                    </div>
+            <div class="bg-[#181F2E] px-6 py-4 border-b border-gray-800 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-line text-emerald-400 text-lg"></i>
+                    <h3 class="font-bold text-lg text-white">實驗數據分析與費茨法則迴歸 (Fitts' Law Analysis)</h3>
                 </div>
-                <button onclick="closeResultsModal()" class="text-slate-400 hover:text-slate-200 p-2 rounded-lg hover:bg-slate-800">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
 
-            <!-- Modal Body -->
-            <div class="p-6 space-y-6">
-                
-                <!-- Key Analytics Metrics Overview -->
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                        <div class="text-xs text-slate-400 mb-1">平均移動時間 (MT)</div>
-                        <div id="statAvgMT" class="text-lg font-mono font-bold text-cyan-400">-- ms</div>
+            <div class="p-6 overflow-y-auto space-y-6">
+                <!-- Stat Cards Grid -->
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="bg-[#161D2C] p-4 rounded-lg border border-gray-800">
+                        <div class="text-xs text-gray-400">有效試驗數據</div>
+                        <div id="statTotalTrials" class="text-2xl font-bold code-font text-white mt-1">45</div>
+                        <div class="text-[10px] text-gray-400 mt-1">15 Trials × 3 Steps</div>
                     </div>
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                        <div class="text-xs text-slate-400 mb-1">吞吐量 (Throughput)</div>
-                        <div id="statThroughput" class="text-lg font-mono font-bold text-emerald-400">-- bits/s</div>
+                    <div class="bg-[#161D2C] p-4 rounded-lg border border-gray-800">
+                        <div class="text-xs text-gray-400">線性迴歸 R² (擬合度)</div>
+                        <div id="statRSquared" class="text-2xl font-bold code-font text-emerald-400 mt-1">0.000</div>
+                        <div id="statRegressionEq" class="text-[10px] text-gray-400 mt-1">MT = a + b × ID</div>
                     </div>
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                        <div class="text-xs text-slate-400 mb-1">迴歸方程式</div>
-                        <div id="statRegressionEq" class="text-xs font-mono font-bold text-amber-300 truncate">MT = a + b·ID</div>
+                    <div class="bg-[#161D2C] p-4 rounded-lg border border-gray-800">
+                        <div class="text-xs text-gray-400">吞吐量 (Throughput)</div>
+                        <div id="statAvgTP" class="text-2xl font-bold code-font text-cyan-400 mt-1">0.00 <span class="text-xs font-normal">bits/s</span></div>
+                        <div class="text-[10px] text-gray-400 mt-1">Mean Throughput</div>
                     </div>
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                        <div class="text-xs text-slate-400 mb-1">擬合優度 (R²)</div>
-                        <div id="statRSquared" class="text-lg font-mono font-bold text-purple-400">--</div>
-                    </div>
-                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
-                        <div class="text-xs text-slate-400 mb-1">點擊準確率</div>
-                        <div id="statAccuracy" class="text-lg font-mono font-bold text-blue-400">-- %</div>
+                    <div class="bg-[#161D2C] p-4 rounded-lg border border-gray-800">
+                        <div class="text-xs text-gray-400">總 Miss 次數 / 錯誤率</div>
+                        <div id="statTotalMisses" class="text-2xl font-bold code-font text-rose-400 mt-1">0 <span class="text-xs font-normal">(0%)</span></div>
+                        <div class="text-[10px] text-gray-400 mt-1">Target acquisition error</div>
                     </div>
                 </div>
 
-                <!-- Regression Canvas Chart -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-                            Fitts' Law Regression Analysis (ID vs. MT)
-                        </h3>
-                        <span class="text-xs text-slate-400 font-mono">ID = log2(A/W + 1)</span>
+                <!-- Regression Chart Container -->
+                <div class="bg-[#161D2C] p-4 rounded-lg border border-gray-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-gray-300">ID (bits) vs Movement Time MT (ms) 散佈圖與迴歸線</span>
+                        <span class="text-[11px] text-gray-400 code-font">Model: MT = a + b · ID</span>
                     </div>
-                    <div class="w-full h-72 relative">
-                        <canvas id="fittsChart" class="w-full h-full block rounded-lg bg-slate-950"></canvas>
+                    <div class="h-64 w-full">
+                        <canvas id="fittsChart"></canvas>
                     </div>
                 </div>
 
-                <!-- Raw Data Preview Table -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <h3 class="text-sm font-bold text-slate-200 mb-3">試驗詳細原始數據 (Raw Data Preview)</h3>
-                    <div class="max-h-56 overflow-y-auto border border-slate-800 rounded-lg">
-                        <table class="w-full text-left border-collapse text-xs font-mono">
-                            <thead class="bg-slate-800/80 sticky top-0 text-slate-300">
-                                <tr>
-                                    <th class="p-2 border-b border-slate-700">Trial</th>
-                                    <th class="p-2 border-b border-slate-700">目標類型</th>
-                                    <th class="p-2 border-b border-slate-700">Distance (A)</th>
-                                    <th class="p-2 border-b border-slate-700">Width (W)</th>
-                                    <th class="p-2 border-b border-slate-700">ID (bits)</th>
-                                    <th class="p-2 border-b border-slate-700">MT (ms)</th>
-                                    <th class="p-2 border-b border-slate-700">Errors</th>
-                                </tr>
-                            </thead>
-                            <tbody id="trialDataTableBody" class="divide-y divide-slate-800 text-slate-300">
-                                <!-- Dynamically populated rows -->
-                            </tbody>
-                        </table>
+                <!-- Step Summary Comparisons -->
+                <div class="bg-[#161D2C] p-4 rounded-lg border border-gray-800">
+                    <h4 class="text-xs font-semibold text-gray-300 mb-3">各操作區域 (Steps) 平均表現</h4>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div class="bg-[#0F1420] p-3 rounded border border-gray-800">
+                            <div class="text-xs font-bold text-rose-400 mb-1">Step 1: 搶票區</div>
+                            <div class="text-xs text-gray-400">Mean ID: <span id="s1MeanID" class="code-font text-gray-200">-</span> bits</div>
+                            <div class="text-xs text-gray-400">Mean MT: <span id="s1MeanMT" class="code-font text-gray-200">-</span> ms</div>
+                            <div class="text-xs text-gray-400">Misses: <span id="s1Misses" class="code-font text-rose-400">-</span></div>
+                        </div>
+                        <div class="bg-[#0F1420] p-3 rounded border border-gray-800">
+                            <div class="text-xs font-bold text-cyan-400 mb-1">Step 2: 選位區</div>
+                            <div class="text-xs text-gray-400">Mean ID: <span id="s2MeanID" class="code-font text-gray-200">-</span> bits</div>
+                            <div class="text-xs text-gray-400">Mean MT: <span id="s2MeanMT" class="code-font text-gray-200">-</span> ms</div>
+                            <div class="text-xs text-gray-400">Misses: <span id="s2Misses" class="code-font text-rose-400">-</span></div>
+                        </div>
+                        <div class="bg-[#0F1420] p-3 rounded border border-gray-800">
+                            <div class="text-xs font-bold text-emerald-400 mb-1">Step 3: 付款區</div>
+                            <div class="text-xs text-gray-400">Mean ID: <span id="s3MeanID" class="code-font text-gray-200">-</span> bits</div>
+                            <div class="text-xs text-gray-400">Mean MT: <span id="s3MeanMT" class="code-font text-gray-200">-</span> ms</div>
+                            <div class="text-xs text-gray-400">Misses: <span id="s3Misses" class="code-font text-rose-400">-</span></div>
+                        </div>
                     </div>
                 </div>
-
             </div>
 
-            <!-- Modal Footer Controls -->
-            <div class="p-5 border-t border-medical-border bg-medical-panel flex flex-wrap items-center justify-between gap-3 sticky bottom-0">
-                <div class="flex items-center gap-2">
-                    <button onclick="downloadCSV()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition duration-150 flex items-center gap-2 shadow-lg shadow-emerald-600/20">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        下載 CSV 數據
-                    </button>
-                    <button onclick="copyToClipboard()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-lg transition duration-150 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-                        複製數據至剪貼簿
-                    </button>
-                </div>
-                
-                <button onclick="resetExperiment(); closeResultsModal();" class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg transition duration-150 flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    再次測試
+            <div class="bg-[#181F2E] px-6 py-4 border-t border-gray-800 flex justify-between items-center">
+                <button id="copyJsonBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-semibold transition border border-gray-700 flex items-center gap-1.5">
+                    <i class="fa-regular fa-copy"></i> 複製 CSV 數據
                 </button>
+                <div class="flex space-x-3">
+                    <button id="restartTestBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg text-xs font-semibold transition border border-gray-700">
+                        重新測試
+                    </button>
+                    <button id="downloadCsvBtn" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-lg">
+                        <i class="fa-solid fa-file-csv"></i> 下載完整 CSV 數據
+                    </button>
+                </div>
             </div>
-
         </div>
     </div>
 
+    <!-- Application Script -->
     <script>
-        // --- Core State Variables ---
-        const TOTAL_TRIALS = 24;
-        const DISTANCES = [180, 320, 480, 620]; // Distance A in pixels
-        const WIDTHS = [24, 48, 88];          // Target Width W in pixels
+        // --- 1. Global State ---
+        const TOTAL_PRACTICE_TRIALS = 3;
+        const TOTAL_FORMAL_TRIALS = 15;
 
-        let trialSequence = [];
+        let experimentPhase = 'IDLE'; // 'IDLE', 'PRACTICE', 'FORMAL', 'FINISHED'
         let currentTrialIndex = 0;
-        let trialResults = [];
-        
-        let experimentState = 'IDLE'; // 'IDLE', 'WAITING_START', 'WAITING_TARGET', 'FINISHED'
-        let trialStartTime = 0;
-        let currentTrialErrors = 0;
-        let soundEnabled = true;
+        let currentStep = 0; // 0: Start Anchor, 1: Booking, 2: Seat, 3: Payment
 
-        // Web Audio Context for sound effects
+        let lastClickX = 0;
+        let lastClickY = 0;
+        let stepStartTime = 0;
+        let stepMisses = 0;
+
+        let totalClicks = 0;
+        let totalMisses = 0;
+
+        let practiceData = [];
+        let formalData = []; 
+        let trialConfigs = [];
+
+        let chartInstance = null;
+
+        // --- Web Audio API ---
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let audioCtx = null;
 
-        // Element References
-        const arenaContainer = document.getElementById('arenaContainer');
+        function playSound(freq, type, duration) {
+            try {
+                if (!audioCtx) audioCtx = new AudioCtx();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type || 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        // --- 2. Welford Approach Angle Effective Width Correction ---
+        function getEffectiveWidthForAngle(startX, startY, targetX, targetY, targetW, targetH) {
+            if (targetW === targetH) return targetW; // Circle target
+            const dx = Math.abs(targetX - startX);
+            const dy = Math.abs(targetY - startY);
+            const theta = Math.atan2(dy, dx);
+            const wProjected = (targetW * targetH) / (targetW * Math.sin(theta) + targetH * Math.cos(theta));
+            return wProjected;
+        }
+
+        // Fisher-Yates Shuffle
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        // --- 3. Factorial Controlled Target Generator (Wide ID Range: 1.4 ~ 5.2 bits) ---
+        function generateControlledConfigs(numTrials) {
+            const s1_presets = [
+                { w: 140, h: 48, y: 320, x: 50 },  // Low ID
+                { w: 90,  h: 48, y: 200, x: 120 }, // Mid ID
+                { w: 120, h: 48, y: 450, x: 60 },  // Mid ID
+                { w: 55,  h: 48, y: 380, x: 200 }, // High ID
+                { w: 70,  h: 48, y: 260, x: 100 }  // Mid-High ID
+            ];
+
+            const s2_presets = [
+                { w: 36, h: 36, y: 300, x: 380 }, // Low ID
+                { w: 22, h: 22, y: 220, x: 480 }, // Mid ID
+                { w: 14, h: 14, y: 420, x: 650 }, // High ID
+                { w: 28, h: 28, y: 180, x: 520 }, // Mid ID
+                { w: 12, h: 12, y: 360, x: 660 }  // Very High ID
+            ];
+
+            const s3_presets = [
+                { w: 100, h: 42, y: 350, x: 770 }, // Low ID
+                { w: 60,  h: 42, y: 220, x: 820 }, // Mid ID
+                { w: 40,  h: 42, y: 480, x: 910 }, // High ID
+                { w: 80,  h: 42, y: 280, x: 800 }, // Mid ID
+                { w: 32,  h: 42, y: 400, x: 930 }  // Very High ID
+            ];
+
+            const baseConfigs = [];
+            for (let i = 0; i < numTrials; i++) {
+                const anchor = { x: 490, y: 530, w: 90, h: 42 };
+                const s1 = s1_presets[i % s1_presets.length];
+                const s2 = s2_presets[(i + 1) % s2_presets.length];
+                const s3 = s3_presets[(i + 2) % s3_presets.length];
+
+                baseConfigs.push({
+                    anchor: anchor,
+                    step1: { x: s1.x, y: s1.y, w: s1.w, h: s1.h },
+                    step2: { x: s2.x, y: s2.y, w: s2.w, h: s2.h },
+                    step3: { x: s3.x, y: s3.y, w: s3.w, h: s3.h }
+                });
+            }
+
+            shuffleArray(baseConfigs);
+            return baseConfigs;
+        }
+
+        // --- DOM Elements ---
         const interactiveLayer = document.getElementById('interactiveLayer');
         const welcomeOverlay = document.getElementById('welcomeOverlay');
-        const trialCounterText = document.getElementById('trialCounterText');
-        const trialProgressBar = document.getElementById('trialProgressBar');
-        const liveAvgMT = document.getElementById('liveAvgMT');
-        const liveAccuracy = document.getElementById('liveAccuracy');
-        const liveTotalErrors = document.getElementById('liveTotalErrors');
-        const arenaStatusText = document.getElementById('arenaStatusText');
-        const arenaStatusDot = document.getElementById('arenaStatusDot');
-        const currentTrialInfo = document.getElementById('currentTrialInfo');
+        const practiceBanner = document.getElementById('practiceBanner');
+        const resultsModal = document.getElementById('resultsModal');
+        const phaseIndicator = document.getElementById('phaseIndicator');
+        const trialProgress = document.getElementById('trialProgress');
+        const errorRateDisplay = document.getElementById('errorRateDisplay');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
 
-        function initAudio() {
-            if (!audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (AudioContext) {
-                    audioCtx = new AudioContext();
+        // --- UI & Toast Notifications ---
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastText').textContent = message;
+            toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-2');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-2');
+            }, 2200);
+        }
+
+        function updateProgressUI() {
+            const total = experimentPhase === 'PRACTICE' ? TOTAL_PRACTICE_TRIALS : TOTAL_FORMAL_TRIALS;
+            const current = currentTrialIndex + 1;
+            trialProgress.textContent = `${Math.min(current, total)} / ${total}`;
+            
+            const errRate = totalClicks > 0 ? ((totalMisses / totalClicks) * 100).toFixed(1) : "0.0";
+            errorRateDisplay.textContent = `${errRate}%`;
+
+            if (experimentPhase === 'PRACTICE') {
+                phaseIndicator.textContent = "練習階段";
+                phaseIndicator.className = "font-bold code-font text-yellow-400";
+            } else if (experimentPhase === 'FORMAL') {
+                phaseIndicator.textContent = "正式實驗";
+                phaseIndicator.className = "font-bold code-font text-emerald-400";
+            } else {
+                phaseIndicator.textContent = "未開始";
+                phaseIndicator.className = "font-bold code-font text-gray-400";
+            }
+        }
+
+        // --- Miss Click Event Handler ---
+        function handleMissClick(e) {
+            e.stopPropagation();
+            if (currentStep === 0) return; // Don't count miss on Start Anchor
+
+            totalClicks++;
+            totalMisses++;
+            stepMisses++;
+            playSound(180, 'sawtooth', 0.12);
+            updateProgressUI();
+
+            // Create Visual Miss Ripple
+            const frameRect = document.getElementById('dashboardFrame').getBoundingClientRect();
+            const missX = e.clientX - frameRect.left;
+            const missY = e.clientY - frameRect.top;
+
+            const missDot = document.createElement('div');
+            missDot.className = 'absolute w-4 h-4 rounded-full bg-rose-500/80 border border-white pointer-events-none transform -translate-x-1/2 -translate-y-1/2 z-40 animate-ping';
+            missDot.style.left = `${missX}px`;
+            missDot.style.top = `${missY}px`;
+            interactiveLayer.appendChild(missDot);
+
+            setTimeout(() => missDot.remove(), 400);
+        }
+
+        // --- Target Hit Event Handler ---
+        function handleTargetHit(targetConfig, stepName, isCircle = false) {
+            const mt = performance.now() - stepStartTime;
+            totalClicks++;
+            playSound(800, 'sine', 0.08);
+
+            const targetCenterX = targetConfig.x + targetConfig.w / 2;
+            const targetCenterY = targetConfig.y + targetConfig.h / 2;
+
+            const distanceA = Math.hypot(targetCenterX - lastClickX, targetCenterY - lastClickY);
+            const correctedW = getEffectiveWidthForAngle(lastClickX, lastClickY, targetCenterX, targetCenterY, targetConfig.w, targetConfig.h);
+            
+            // Shannon Formulation: ID = log2(A / W + 1)
+            const ID = Math.log2((distanceA / correctedW) + 1);
+
+            document.getElementById('lastDistanceText').textContent = `${Math.round(distanceA)}px`;
+            document.getElementById('lastWidthText').textContent = `${Math.round(correctedW)}px`;
+            document.getElementById('lastIDText').textContent = `${ID.toFixed(2)} bits`;
+
+            const record = {
+                trialId: currentTrialIndex + 1,
+                stepName: stepName,
+                stepNumber: currentStep,
+                startX: lastClickX,
+                startY: lastClickY,
+                targetX: targetCenterX,
+                targetY: targetCenterY,
+                distanceA: distanceA,
+                nominalW: targetConfig.w,
+                correctedW: correctedW,
+                ID: ID,
+                movementTimeMT: mt,
+                stepMisses: stepMisses
+            };
+
+            if (experimentPhase === 'PRACTICE') {
+                practiceData.push(record);
+            } else if (experimentPhase === 'FORMAL') {
+                formalData.push(record);
+            }
+
+            // Move to Next Step or Next Trial
+            lastClickX = targetCenterX;
+            lastClickY = targetCenterY;
+
+            if (currentStep < 3) {
+                currentStep++;
+                stepMisses = 0;
+                stepStartTime = performance.now();
+                renderStep();
+            } else {
+                // Trial Completed
+                currentTrialIndex++;
+                currentStep = 0;
+                const maxTrials = experimentPhase === 'PRACTICE' ? TOTAL_PRACTICE_TRIALS : TOTAL_FORMAL_TRIALS;
+
+                if (currentTrialIndex < maxTrials) {
+                    renderStep();
+                } else {
+                    if (experimentPhase === 'PRACTICE') {
+                        experimentPhase = 'FORMAL';
+                        currentTrialIndex = 0;
+                        trialConfigs = generateControlledConfigs(TOTAL_FORMAL_TRIALS);
+                        practiceBanner.classList.add('hidden');
+                        showToast("練習結束！即將開始 15 輪正式實驗");
+                        renderStep();
+                    } else {
+                        experimentPhase = 'FINISHED';
+                        interactiveLayer.innerHTML = '';
+                        statusText.textContent = "實驗完成！正在計算費茨法則迴歸模型...";
+                        statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+                        showResultsModal();
+                    }
                 }
             }
+            updateProgressUI();
         }
 
-        function playSound(type) {
-            if (!soundEnabled) return;
-            initAudio();
-            if (!audioCtx) return;
+        // --- Interactive Target Rendering Engine ---
+        function renderStep() {
+            interactiveLayer.innerHTML = ''; 
+            const config = trialConfigs[currentTrialIndex];
 
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+            // Background Click Catch Layer for Miss Tracking
+            const bgMissCatcher = document.createElement('div');
+            bgMissCatcher.className = 'absolute inset-0 z-0';
+            bgMissCatcher.addEventListener('click', handleMissClick);
+            interactiveLayer.appendChild(bgMissCatcher);
 
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
+            if (currentStep === 0) {
+                // Step 0: Render Start Anchor + PREVIEW HIGHLIGHT of Next Target (Eliminates Visual Search Time)
+                statusText.textContent = "請移動眼神先確認預告目標位置，再點擊「START」起始點鎖定原點";
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-yellow-400 animate-ping";
 
-            const now = audioCtx.currentTime;
+                // Render Preview Ghost Frame for Step 1
+                const preview = document.createElement('div');
+                preview.className = "absolute z-0 border-2 border-dashed border-rose-500/60 bg-rose-500/10 rounded-lg pointer-events-none";
+                preview.style.left = `${config.step1.x}px`;
+                preview.style.top = `${config.step1.y}px`;
+                preview.style.width = `${config.step1.w}px`;
+                preview.style.height = `${config.step1.h}px`;
+                interactiveLayer.appendChild(preview);
 
-            if (type === 'start') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(587.33, now); // D5
-                osc.frequency.exponentialRampToValueAtTime(880, now + 0.08); // A5
-                gain.gain.setValueAtTime(0.12, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-                osc.start(now);
-                osc.stop(now + 0.08);
-            } else if (type === 'hit') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, now); // A5
-                osc.frequency.exponentialRampToValueAtTime(1760, now + 0.1); // A6
-                gain.gain.setValueAtTime(0.15, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            } else if (type === 'miss') {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(200, now);
-                osc.frequency.setValueAtTime(120, now + 0.08);
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-                osc.start(now);
-                osc.stop(now + 0.18);
-            }
-        }
+                // Start Anchor Button
+                const anchor = document.createElement('button');
+                anchor.className = "absolute z-10 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-bold rounded-lg shadow-lg flex items-center justify-center code-font text-xs static-target glow-yellow border-2 border-white";
+                anchor.style.left = `${config.anchor.x}px`;
+                anchor.style.top = `${config.anchor.y}px`;
+                anchor.style.width = `${config.anchor.w}px`;
+                anchor.style.height = `${config.anchor.h}px`;
+                anchor.innerHTML = '<i class="fa-solid fa-location-crosshairs mr-1"></i> START';
 
-        function toggleSound() {
-            soundEnabled = !soundEnabled;
-            document.getElementById('soundIconOn').classList.toggle('hidden', !soundEnabled);
-            document.getElementById('soundIconOff').classList.toggle('hidden', soundEnabled);
-            showToast(soundEnabled ? "音效已開啟" : "音效已靜音", "info");
-        }
-
-        // Calculate Shannon Index of Difficulty: ID = log2(A/W + 1)
-        function calculateID(A, W) {
-            return Math.log2((A / W) + 1);
-        }
-
-        function getTargetMeta(W) {
-            if (W === 24) {
-                return {
-                    name: '高風險藥物確認',
-                    code: 'HIGH_RISK_DRUG',
-                    bgClass: 'bg-amber-500',
-                    borderClass: 'border-amber-300',
-                    textClass: 'text-amber-400',
-                    glowClass: 'shadow-amber-500/50'
-                };
-            } else if (W === 48) {
-                return {
-                    name: '生理數據同步',
-                    code: 'VITALS_SYNC',
-                    bgClass: 'bg-cyan-500',
-                    borderClass: 'border-cyan-300',
-                    textClass: 'text-cyan-400',
-                    glowClass: 'shadow-cyan-500/50'
-                };
-            } else {
-                return {
-                    name: '緊急 CPR 警報',
-                    code: 'EMERGENCY_CPR',
-                    bgClass: 'bg-rose-600 animate-pulse-danger',
-                    borderClass: 'border-rose-300',
-                    textClass: 'text-rose-400',
-                    glowClass: 'shadow-rose-600/50'
-                };
-            }
-        }
-
-        function generateTrials() {
-            let pairs = [];
-            DISTANCES.forEach(A => {
-                WIDTHS.forEach(W => {
-                    pairs.push({ A, W });
-                });
-            }); // 12 unique pairs
-
-            // Duplicate pairs to make 24 trials
-            let fullList = [...pairs, ...pairs];
-
-            // Fisher-Yates Shuffle
-            for (let i = fullList.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [fullList[i], fullList[j]] = [fullList[j], fullList[i]];
-            }
-
-            return fullList.map((item, index) => {
-                const id = calculateID(item.A, item.W);
-                const meta = getTargetMeta(item.W);
-                return {
-                    trialNum: index + 1,
-                    A: item.A,
-                    W: item.W,
-                    ID: id,
-                    targetMeta: meta
-                };
-            });
-        }
-
-        function startExperiment() {
-            initAudio();
-            welcomeOverlay.classList.add('hidden');
-            trialSequence = generateTrials();
-            currentTrialIndex = 0;
-            trialResults = [];
-            
-            // Set arena click listener for detecting misses
-            arenaContainer.removeEventListener('click', handleArenaMissClick);
-            arenaContainer.addEventListener('click', handleArenaMissClick);
-
-            updateUIHeader();
-            prepareNextTrial();
-        }
-
-        function prepareNextTrial() {
-            if (currentTrialIndex >= TOTAL_TRIALS) {
-                finishExperiment();
-                return;
-            }
-
-            experimentState = 'WAITING_START';
-            currentTrialErrors = 0;
-
-            const currentTrial = trialSequence[currentTrialIndex];
-
-            // Update UI elements
-            arenaStatusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping';
-            arenaStatusText.textContent = `試驗 ${currentTrialIndex + 1}/${TOTAL_TRIALS}：請點擊「起始導引點」`;
-            
-            currentTrialInfo.classList.remove('hidden');
-            document.getElementById('infoDist').textContent = currentTrial.A;
-            document.getElementById('infoWidth').textContent = currentTrial.W;
-            document.getElementById('infoID').textContent = currentTrial.ID.toFixed(2);
-
-            updateUIHeader();
-            renderStartButton();
-        }
-
-        function renderStartButton() {
-            interactiveLayer.innerHTML = '';
-
-            const startBtn = document.createElement('button');
-            startBtn.id = 'startDot';
-            startBtn.className = 'absolute transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-emerald-500 border-2 border-emerald-200 shadow-lg shadow-emerald-500/50 animate-pulse-start flex items-center justify-center font-bold text-slate-950 text-xs transition duration-150 active:scale-90';
-            startBtn.innerHTML = '<span>START</span>';
-
-            // Center of the arena
-            const rect = arenaContainer.getBoundingClientRect();
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-
-            startBtn.style.left = `${centerX}px`;
-            startBtn.style.top = `${centerY}px`;
-
-            startBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (experimentState !== 'WAITING_START') return;
-
-                playSound('start');
-                experimentState = 'WAITING_TARGET';
-                arenaStatusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
-                arenaStatusText.textContent = `請迅速點擊出現的「${trialSequence[currentTrialIndex].targetMeta.name}」`;
-
-                renderTarget(centerX, centerY);
-            });
-
-            interactiveLayer.appendChild(startBtn);
-        }
-
-        function renderTarget(startX, startY) {
-            interactiveLayer.innerHTML = '';
-
-            const currentTrial = trialSequence[currentTrialIndex];
-            const A = currentTrial.A;
-            const W = currentTrial.W;
-            const meta = currentTrial.targetMeta;
-
-            const rect = arenaContainer.getBoundingClientRect();
-            const padding = W / 2 + 15;
-
-            // Find a valid angle theta such that the target stays within the arena bounds
-            let angle = Math.random() * Math.PI * 2;
-            let targetX = startX + A * Math.cos(angle);
-            let targetY = startY + A * Math.sin(angle);
-
-            let attempts = 0;
-            while ((targetX < padding || targetX > rect.width - padding || targetY < padding || targetY > rect.height - padding) && attempts < 100) {
-                angle += Math.PI / 8;
-                targetX = startX + A * Math.cos(angle);
-                targetY = startY + A * Math.sin(angle);
-                attempts++;
-            }
-
-            // Fallback scaling if arena is smaller than distance requirement
-            if (attempts >= 100) {
-                targetX = Math.max(padding, Math.min(rect.width - padding, targetX));
-                targetY = Math.max(padding, Math.min(rect.height - padding, targetY));
-            }
-
-            const targetBtn = document.createElement('button');
-            targetBtn.className = `absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full ${meta.bgClass} border-2 ${meta.borderClass} shadow-lg ${meta.glowClass} flex items-center justify-center font-bold text-slate-950 text-[10px] transition duration-75 active:scale-95`;
-            targetBtn.style.width = `${W}px`;
-            targetBtn.style.height = `${W}px`;
-            targetBtn.style.left = `${targetX}px`;
-            targetBtn.style.top = `${targetY}px`;
-
-            if (W >= 48) {
-                targetBtn.innerHTML = `<span class="truncate px-1 pointer-events-none">${meta.name}</span>`;
-            }
-
-            // Start high-precision timer right as target appears
-            trialStartTime = performance.now();
-
-            targetBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (experimentState !== 'WAITING_TARGET') return;
-
-                const endTime = performance.now();
-                const movementTime = Math.round(endTime - trialStartTime);
-
-                playSound('hit');
-
-                // Record data point
-                trialResults.push({
-                    trialNum: currentTrialIndex + 1,
-                    A: A,
-                    W: W,
-                    ID: currentTrial.ID,
-                    MT: movementTime,
-                    errors: currentTrialErrors,
-                    targetName: meta.name,
-                    timestamp: new Date().toISOString()
+                anchor.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    playSound(600, 'sine', 0.08);
+                    const rect = anchor.getBoundingClientRect();
+                    const frameRect = document.getElementById('dashboardFrame').getBoundingClientRect();
+                    
+                    lastClickX = (rect.left - frameRect.left) + rect.width / 2;
+                    lastClickY = (rect.top - frameRect.top) + rect.height / 2;
+                    
+                    currentStep = 1;
+                    stepMisses = 0;
+                    stepStartTime = performance.now();
+                    renderStep();
                 });
 
-                currentTrialIndex++;
-                prepareNextTrial();
-            });
+                interactiveLayer.appendChild(anchor);
 
-            interactiveLayer.appendChild(targetBtn);
-        }
-
-        function handleArenaMissClick(e) {
-            if (experimentState === 'WAITING_TARGET') {
-                currentTrialErrors++;
-                playSound('miss');
-
-                // Visual miss ripple indicator
-                const rect = arenaContainer.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                const clickY = e.clientY - rect.top;
-
-                const missDot = document.createElement('div');
-                missDot.className = 'absolute pointer-events-none w-4 h-4 rounded-full bg-rose-500/80 -translate-x-1/2 -translate-y-1/2 animate-ping';
-                missDot.style.left = `${clickX}px`;
-                missDot.style.top = `${clickY}px`;
-                interactiveLayer.appendChild(missDot);
-
-                setTimeout(() => missDot.remove(), 500);
-
-                updateUIHeader();
-            }
-        }
-
-        function updateUIHeader() {
-            trialCounterText.textContent = `${currentTrialIndex} / ${TOTAL_TRIALS}`;
-            const progressPercent = (currentTrialIndex / TOTAL_TRIALS) * 100;
-            trialProgressBar.style.width = `${progressPercent}%`;
-
-            if (trialResults.length > 0) {
-                const totalMT = trialResults.reduce((sum, r) => sum + r.MT, 0);
-                const avgMT = Math.round(totalMT / trialResults.length);
-                liveAvgMT.textContent = `${avgMT} ms`;
-
-                const totalMisses = trialResults.reduce((sum, r) => sum + r.errors, 0) + currentTrialErrors;
-                liveTotalErrors.textContent = `${totalMisses} 次`;
-
-                const totalClicks = trialResults.length + totalMisses;
-                const accuracy = totalClicks > 0 ? ((trialResults.length / totalClicks) * 100).toFixed(1) : 100;
-                liveAccuracy.textContent = `${accuracy} %`;
             } else {
-                liveAvgMT.textContent = `-- ms`;
-                liveAccuracy.textContent = `-- %`;
-                liveTotalErrors.textContent = `${currentTrialErrors} 次`;
+                // Steps 1 to 3: Active Target
+                let curTargetConfig, nextPreviewConfig, labelText, targetClass, bgDotColor;
+
+                if (currentStep === 1) {
+                    curTargetConfig = config.step1;
+                    nextPreviewConfig = config.step2;
+                    labelText = '<i class="fa-solid fa-bolt mr-1"></i> 搶票';
+                    targetClass = "bg-rose-500 hover:bg-rose-400 text-white rounded-lg glow-pink";
+                    bgDotColor = "bg-rose-500";
+                    statusText.textContent = "步驟 1/3: 請快速點擊搶票區高亮按鈕";
+                } else if (currentStep === 2) {
+                    curTargetConfig = config.step2;
+                    nextPreviewConfig = config.step3;
+                    labelText = '';
+                    targetClass = "bg-cyan-400 hover:bg-cyan-300 rounded-full glow-cyan";
+                    bgDotColor = "bg-cyan-400";
+                    statusText.textContent = "步驟 2/3: 請精準點擊座位選擇區圓點座位";
+                } else if (currentStep === 3) {
+                    curTargetConfig = config.step3;
+                    nextPreviewConfig = null;
+                    labelText = '<i class="fa-solid fa-credit-card mr-1"></i> 結帳';
+                    targetClass = "bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg glow-mint";
+                    bgDotColor = "bg-emerald-400";
+                    statusText.textContent = "步驟 3/3: 請點擊付款確認區結帳按鈕";
+                }
+                statusDot.className = `w-2.5 h-2.5 rounded-full ${bgDotColor} animate-ping`;
+
+                // Render Preview Ghost for Next Step if available
+                if (nextPreviewConfig) {
+                    const preview = document.createElement('div');
+                    const isCircle = currentStep === 1; // Step 2 target is circle
+                    preview.className = `absolute z-0 border-2 border-dashed border-cyan-400/60 bg-cyan-400/10 pointer-events-none ${isCircle ? 'rounded-full' : 'rounded-lg'}`;
+                    preview.style.left = `${nextPreviewConfig.x}px`;
+                    preview.style.top = `${nextPreviewConfig.y}px`;
+                    preview.style.width = `${nextPreviewConfig.w}px`;
+                    preview.style.height = `${nextPreviewConfig.h}px`;
+                    interactiveLayer.appendChild(preview);
+                }
+
+                // Render Active Target
+                const target = document.createElement('button');
+                target.className = `absolute z-10 font-bold shadow-md text-xs static-target border-2 border-white flex items-center justify-center ${targetClass}`;
+                target.style.left = `${curTargetConfig.x}px`;
+                target.style.top = `${curTargetConfig.y}px`;
+                target.style.width = `${curTargetConfig.w}px`;
+                target.style.height = `${curTargetConfig.h}px`;
+                target.innerHTML = labelText;
+
+                target.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleTargetHit(curTargetConfig, `Step_${currentStep}`, currentStep === 2);
+                });
+
+                interactiveLayer.appendChild(target);
             }
         }
 
-        function finishExperiment() {
-            experimentState = 'FINISHED';
-            arenaContainer.removeEventListener('click', handleArenaMissClick);
-            interactiveLayer.innerHTML = '';
-            arenaStatusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
-            arenaStatusText.textContent = '實驗完成！請參閱數據分析結果';
+        // --- 4. Analytical Engine & Linear Regression ---
+        function calculateLinearRegression(data) {
+            // ISO Cleaning: Exclude Misses and Outliers (MT < 150ms or > 2500ms)
+            const cleanData = data.filter(d => d.stepMisses === 0 && d.movementTimeMT >= 150 && d.movementTimeMT <= 2500);
+            const n = cleanData.length;
+            if (n === 0) return { a: 0, b: 0, r2: 0, throughput: 0, cleanCount: 0 };
 
-            // Linear Regression calculation: MT = a + b * ID
-            const n = trialResults.length;
-            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0, sumYY = 0;
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+            let totalTP = 0;
 
-            let throughputList = [];
-
-            trialResults.forEach(r => {
-                const x = r.ID;
-                const y = r.MT;
+            cleanData.forEach(d => {
+                const x = d.ID;
+                const y = d.movementTimeMT;
                 sumX += x;
                 sumY += y;
                 sumXY += x * y;
-                sumXX += x * x;
-                sumYY += y * y;
-
-                // Throughput TP = ID / (MT in seconds)
-                if (r.MT > 0) {
-                    throughputList.push(x / (r.MT / 1000));
-                }
+                sumX2 += x * x;
+                sumY2 += y * y;
+                totalTP += (x / (y / 1000)); // Throughput = ID / (MT in seconds)
             });
 
             const meanX = sumX / n;
             const meanY = sumY / n;
+            const slopeB = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const interceptA = meanY - slopeB * meanX;
 
-            // Slope (b) and Intercept (a)
-            const b = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-            const a = meanY - b * meanX;
-
-            // R^2 (Coefficient of determination)
-            const ssTot = trialResults.reduce((sum, r) => sum + Math.pow(r.MT - meanY, 2), 0);
-            const ssRes = trialResults.reduce((sum, r) => sum + Math.pow(r.MT - (a + b * r.ID), 2), 0);
-            const rSquared = ssTot > 0 ? Math.max(0, 1 - (ssRes / ssTot)) : 1;
-
-            // Mean Throughput
-            const avgThroughput = throughputList.length > 0 
-                ? (throughputList.reduce((s, v) => s + v, 0) / throughputList.length).toFixed(2)
-                : "--";
-
-            const totalErrors = trialResults.reduce((sum, r) => sum + r.errors, 0);
-            const accuracy = ((n / (n + totalErrors)) * 100).toFixed(1);
-
-            // Populate Results Modal
-            document.getElementById('resSubjectId').textContent = document.getElementById('subjectIdInput').value || 'P-001';
-            document.getElementById('statAvgMT').textContent = `${Math.round(meanY)} ms`;
-            document.getElementById('statThroughput').textContent = `${avgThroughput} bits/s`;
-            document.getElementById('statRegressionEq').textContent = `MT = ${Math.round(a)} + ${Math.round(b)}·ID`;
-            document.getElementById('statRSquared').textContent = rSquared.toFixed(3);
-            document.getElementById('statAccuracy').textContent = `${accuracy} %`;
-
-            // Populate Raw Data Table
-            const tableBody = document.getElementById('trialDataTableBody');
-            tableBody.innerHTML = '';
-            trialResults.forEach(r => {
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-slate-800/50 transition-colors';
-                row.innerHTML = `
-                    <td class="p-2 border-b border-slate-800 font-bold text-slate-400">#${r.trialNum}</td>
-                    <td class="p-2 border-b border-slate-800">${r.targetName}</td>
-                    <td class="p-2 border-b border-slate-800 text-cyan-400">${r.A} px</td>
-                    <td class="p-2 border-b border-slate-800 text-amber-400">${r.W} px</td>
-                    <td class="p-2 border-b border-slate-800 font-bold text-purple-400">${r.ID.toFixed(2)}</td>
-                    <td class="p-2 border-b border-slate-800 font-bold text-emerald-400">${r.MT} ms</td>
-                    <td class="p-2 border-b border-slate-800 ${r.errors > 0 ? 'text-rose-400 font-bold' : 'text-slate-500'}">${r.errors}</td>
-                `;
-                tableBody.appendChild(row);
+            // Calculate R-Squared
+            let ssTot = 0, ssRes = 0;
+            cleanData.forEach(d => {
+                const yPred = interceptA + slopeB * d.ID;
+                ssTot += Math.pow(d.movementTimeMT - meanY, 2);
+                ssRes += Math.pow(d.movementTimeMT - yPred, 2);
             });
 
-            // Open Modal
-            document.getElementById('resultsModal').classList.remove('hidden');
+            const r2 = ssTot === 0 ? 0 : Math.max(0, 1 - (ssRes / ssTot));
+            const avgThroughput = totalTP / n;
 
-            // Render Scatter Plot Chart after DOM update
-            setTimeout(() => {
-                renderFittsChart(a, b, rSquared);
-            }, 100);
+            return {
+                a: interceptA,
+                b: slopeB,
+                r2: r2,
+                throughput: avgThroughput,
+                cleanCount: n,
+                cleanData: cleanData
+            };
         }
 
-        function renderFittsChart(a, b, rSquared) {
-            const canvas = document.getElementById('fittsChart');
-            const ctx = canvas.getContext('2d');
+        // --- 5. Render Analytical Dashboard Modal ---
+        function showResultsModal() {
+            resultsModal.classList.remove('hidden');
 
-            // Handle DPI scaling
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * window.devicePixelRatio;
-            canvas.height = rect.height * window.devicePixelRatio;
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            const reg = calculateLinearRegression(formalData);
 
-            const width = rect.width;
-            const height = rect.height;
+            document.getElementById('statTotalTrials').textContent = reg.cleanCount;
+            document.getElementById('statRSquared').textContent = reg.r2.toFixed(3);
+            document.getElementById('statRegressionEq').textContent = `MT = ${reg.a.toFixed(1)} + ${reg.b.toFixed(1)} × ID`;
+            document.getElementById('statAvgTP').innerHTML = `${reg.throughput.toFixed(2)} <span class="text-xs font-normal">bits/s</span>`;
 
-            // Clear Canvas
-            ctx.fillStyle = '#020617';
-            ctx.fillRect(0, 0, width, height);
+            const totalErrPct = totalClicks > 0 ? ((totalMisses / totalClicks) * 100).toFixed(1) : "0.0";
+            document.getElementById('statTotalMisses').innerHTML = `${totalMisses} <span class="text-xs font-normal">(${totalErrPct}%)</span>`;
 
-            const margin = { top: 30, right: 30, bottom: 40, left: 55 };
-            const plotW = width - margin.left - margin.right;
-            const plotH = height - margin.top - margin.bottom;
+            // Calculate per-step statistics
+            [1, 2, 3].forEach(stepNum => {
+                const stepData = formalData.filter(d => d.stepNumber === stepNum && d.stepMisses === 0);
+                const meanID = stepData.reduce((acc, d) => acc + d.ID, 0) / (stepData.length || 1);
+                const meanMT = stepData.reduce((acc, d) => acc + d.movementTimeMT, 0) / (stepData.length || 1);
+                const misses = formalData.filter(d => d.stepNumber === stepNum).reduce((acc, d) => acc + d.stepMisses, 0);
 
-            // Find min & max bounds
-            const xVals = trialResults.map(r => r.ID);
-            const yVals = trialResults.map(r => r.MT);
-
-            const minX = Math.max(0, Math.min(...xVals) - 0.5);
-            const maxX = Math.max(...xVals) + 0.5;
-            const minY = Math.max(0, Math.min(...yVals) - 100);
-            const maxY = Math.max(...yVals) + 150;
-
-            function getCanvasX(x) {
-                return margin.left + ((x - minX) / (maxX - minX)) * plotW;
-            }
-
-            function getCanvasY(y) {
-                return margin.top + plotH - ((y - minY) / (maxY - minY)) * plotH;
-            }
-
-            // Draw Gridlines & Axes
-            ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 1;
-            ctx.font = '10px JetBrains Mono, monospace';
-            ctx.fillStyle = '#64748b';
-
-            // X-Axis Grid & Labels (ID)
-            const xStep = 1.0;
-            for (let x = Math.ceil(minX); x <= maxX; x += xStep) {
-                const cx = getCanvasX(x);
-                ctx.beginPath();
-                ctx.moveTo(cx, margin.top);
-                ctx.lineTo(cx, margin.top + plotH);
-                ctx.stroke();
-
-                ctx.textAlign = 'center';
-                ctx.fillText(`${x} bits`, cx, margin.top + plotH + 18);
-            }
-
-            // Y-Axis Grid & Labels (MT)
-            const yStep = 200;
-            for (let y = Math.ceil(minY / yStep) * yStep; y <= maxY; y += yStep) {
-                const cy = getCanvasY(y);
-                ctx.beginPath();
-                ctx.moveTo(margin.left, cy);
-                ctx.lineTo(margin.left + plotW, cy);
-                ctx.stroke();
-
-                ctx.textAlign = 'right';
-                ctx.fillText(`${y} ms`, margin.left - 8, cy + 3);
-            }
-
-            // Draw Regression Trend Line
-            const lineX1 = minX;
-            const lineY1 = a + b * lineX1;
-            const lineX2 = maxX;
-            const lineY2 = a + b * lineX2;
-
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.moveTo(getCanvasX(lineX1), getCanvasY(lineY1));
-            ctx.lineTo(getCanvasX(lineX2), getCanvasY(lineY2));
-            ctx.stroke();
-
-            // Draw Data Points
-            trialResults.forEach(r => {
-                const cx = getCanvasX(r.ID);
-                const cy = getCanvasY(r.MT);
-
-                let dotColor = '#38bdf8';
-                if (r.W === 24) dotColor = '#f59e0b';
-                else if (r.W === 88) dotColor = '#ef4444';
-
-                // Point outer glow
-                ctx.fillStyle = dotColor + '33';
-                ctx.beginPath();
-                ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Point core
-                ctx.fillStyle = dotColor;
-                ctx.beginPath();
-                ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                document.getElementById(`s${stepNum}MeanID`).textContent = meanID.toFixed(2);
+                document.getElementById(`s${stepNum}MeanMT`).textContent = Math.round(meanMT);
+                document.getElementById(`s${stepNum}Misses`).textContent = misses;
             });
 
-            // Axis Titles
-            ctx.fillStyle = '#94a3b8';
-            ctx.textAlign = 'center';
-            ctx.font = '11px sans-serif';
-            ctx.fillText('難度指數 Index of Difficulty (ID, bits)', margin.left + plotW / 2, height - 8);
-
-            ctx.save();
-            ctx.translate(15, margin.top + plotH / 2);
-            ctx.rotate(-Math.PI / 2);
-            ctx.fillText('移動時間 Movement Time (MT, ms)', 0, 0);
-            ctx.restore();
+            // Render Chart.js Regression Plot
+            renderChart(reg);
         }
 
-        function downloadCSV() {
-            if (trialResults.length === 0) return;
+        function renderChart(reg) {
+            const ctx = document.getElementById('fittsChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
 
-            const subjectId = document.getElementById('subjectIdInput').value || 'P-001';
-            let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Trial,SubjectID,Distance_A_px,Width_W_px,ID_bits,MovementTime_MT_ms,Errors,TargetType,Timestamp\n";
+            const scatterStep1 = reg.cleanData.filter(d => d.stepNumber === 1).map(d => ({ x: d.ID, y: d.movementTimeMT }));
+            const scatterStep2 = reg.cleanData.filter(d => d.stepNumber === 2).map(d => ({ x: d.ID, y: d.movementTimeMT }));
+            const scatterStep3 = reg.cleanData.filter(d => d.stepNumber === 3).map(d => ({ x: d.ID, y: d.movementTimeMT }));
 
-            trialResults.forEach(r => {
-                csvContent += `${r.trialNum},${subjectId},${r.A},${r.W},${r.ID.toFixed(4)},${r.MT},${r.errors},${r.targetName},${r.timestamp}\n`;
+            // Regression Line Coordinates
+            const minX = 1.0;
+            const maxX = 6.0;
+            const regressionLine = [
+                { x: minX, y: reg.a + reg.b * minX },
+                { x: maxX, y: reg.a + reg.b * maxX }
+            ];
+
+            chartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        { label: 'Step 1: 搶票區', data: scatterStep1, backgroundColor: '#f43f5e', pointRadius: 5 },
+                        { label: 'Step 2: 選位區', data: scatterStep2, backgroundColor: '#22d3ee', pointRadius: 5 },
+                        { label: 'Step 3: 付款區', data: scatterStep3, backgroundColor: '#10b981', pointRadius: 5 },
+                        {
+                            label: `迴歸擬合線 (R² = ${reg.r2.toFixed(3)})`,
+                            data: regressionLine,
+                            type: 'line',
+                            borderColor: '#fbbf24',
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: 'Index of Difficulty (ID, bits)', color: '#9ca3af' },
+                            grid: { color: '#1f2937' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Movement Time (MT, ms)', color: '#9ca3af' },
+                            grid: { color: '#1f2937' },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e5e7eb' } }
+                    }
+                }
             });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Fitts_Law_ER_Medical_Data_${subjectId}_${new Date().toISOString().slice(0,10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            showToast("CSV 數據檔已成功匯出下載！", "success");
         }
 
-        function copyToClipboard() {
-            if (trialResults.length === 0) return;
-
-            const subjectId = document.getElementById('subjectIdInput').value || 'P-001';
-            let textData = "Trial\tSubjectID\tDistance_A\tWidth_W\tID_bits\tMT_ms\tErrors\tTargetType\n";
-
-            trialResults.forEach(r => {
-                textData += `${r.trialNum}\t${subjectId}\t${r.A}\t${r.W}\t${r.ID.toFixed(4)}\t${r.MT}\t${r.errors}\t${r.targetName}\n`;
+        // --- 6. Export Functions ---
+        function generateCSV() {
+            let csv = 'Trial_ID,Step_Name,Start_X,Start_Y,Target_X,Target_Y,Distance_A_px,Nominal_W_px,Corrected_W_px,ID_bits,MovementTime_MT_ms,Step_Misses\n';
+            formalData.forEach(d => {
+                csv += `${d.trialId},"${d.stepName}",${Math.round(d.startX)},${Math.round(d.startY)},${Math.round(d.targetX)},${Math.round(d.targetY)},${d.distanceA.toFixed(2)},${d.nominalW},${d.correctedW.toFixed(2)},${d.ID.toFixed(4)},${d.movementTimeMT.toFixed(2)},${d.stepMisses}\n`;
             });
-
-            // Fallback clipboard method for iframe security contexts
-            const textarea = document.createElement("textarea");
-            textarea.value = textData;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                showToast("原始數據已複製至剪貼簿！", "success");
-            } catch (err) {
-                showToast("複製失敗，請重試", "error");
-            }
-            document.body.removeChild(textarea);
+            return csv;
         }
 
-        function resetExperiment() {
+        // --- Event Listeners ---
+        document.getElementById('startExperimentBtn').addEventListener('click', () => {
+            welcomeOverlay.classList.add('hidden');
+            experimentPhase = 'PRACTICE';
             currentTrialIndex = 0;
-            trialResults = [];
-            currentTrialErrors = 0;
-            experimentState = 'IDLE';
-
-            interactiveLayer.innerHTML = '';
-            welcomeOverlay.classList.remove('hidden');
-
-            arenaStatusDot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
-            arenaStatusText.textContent = '請點擊「開始實驗」以啟動測試';
-            currentTrialInfo.classList.add('hidden');
-
-            updateUIHeader();
-            showToast("實驗系統已完成重置", "info");
-        }
-
-        function closeResultsModal() {
-            document.getElementById('resultsModal').classList.add('hidden');
-        }
-
-        function showToast(message, type = "info") {
-            const toastContainer = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-
-            let bgBorder = "bg-slate-900 border-slate-700 text-slate-200";
-            if (type === "success") bgBorder = "bg-emerald-950 border-emerald-700 text-emerald-200";
-            if (type === "error") bgBorder = "bg-rose-950 border-rose-700 text-rose-200";
-
-            toast.className = `px-4 py-2.5 rounded-xl border shadow-xl text-xs font-medium flex items-center gap-2 transform transition-all duration-300 opacity-0 translate-y-2 pointer-events-auto ${bgBorder}`;
-            toast.innerHTML = `<span>${message}</span>`;
-
-            toastContainer.appendChild(toast);
-
-            // Animate in
-            requestAnimationFrame(() => {
-                toast.classList.remove('opacity-0', 'translate-y-2');
-            });
-
-            // Remove toast after delay
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-2');
-                setTimeout(() => toast.remove(), 300);
-            }, 2500);
-        }
-
-        // Initialize UI Header on load
-        window.addEventListener('load', () => {
-            updateUIHeader();
+            currentStep = 0;
+            totalClicks = 0;
+            totalMisses = 0;
+            formalData = [];
+            practiceData = [];
+            practiceBanner.classList.remove('hidden');
+            trialConfigs = generateControlledConfigs(TOTAL_PRACTICE_TRIALS);
+            updateProgressUI();
+            renderStep();
         });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            experimentPhase = 'IDLE';
+            currentTrialIndex = 0;
+            currentStep = 0;
+            welcomeOverlay.classList.remove('hidden');
+            practiceBanner.classList.add('hidden');
+            interactiveLayer.innerHTML = '';
+            statusText.textContent = "請點擊「開始實驗」以啟動測試";
+            updateProgressUI();
+        });
+
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            resultsModal.classList.add('hidden');
+        });
+
+        document.getElementById('restartTestBtn').addEventListener('click', () => {
+            resultsModal.classList.add('hidden');
+            document.getElementById('resetBtn').click();
+        });
+
+        document.getElementById('downloadCsvBtn').addEventListener('click', () => {
+            const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(generateCSV());
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", csvContent);
+            downloadAnchor.setAttribute("download", `Fitts_Law_Experiment_Data_${Date.now()}.csv`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+
+        document.getElementById('copyJsonBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(generateCSV()).then(() => {
+                showToast("CSV 數據已成功複製至剪貼簿！");
+            });
+        });
+
+        // Initialize UI
+        updateProgressUI();
     </script>
 </body>
 </html>
