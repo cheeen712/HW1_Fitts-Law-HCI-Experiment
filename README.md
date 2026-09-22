@@ -152,6 +152,6 @@ index.html
 
 ## 9. Demo
 
-**Live Demo:** `<[your-github-pages-url](https://github.com/cheeen712/HW1_Fitts-Law-HCI-Experiment.git)>`
+**Live Demo:** `[https://cheeen712.github.io/HW1_Fitts-Law-HCI-Experiment/](https://cheeen712.github.io/HW1_Fitts-Law-HCI-Experiment/)`
 
 **Video:** `<your-video-url>`
