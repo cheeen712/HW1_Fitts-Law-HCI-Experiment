@@ -2,8 +2,6 @@
 
 An interactive HCI experiment that applies **Fitts' Law** to a simulated concert ticket booking scenario. The system evaluates pointing performance under different target sizes and movement distances using a three-stage ticket-booking task.
 
-Built with **HTML5, Tailwind CSS, JavaScript, Chart.js, Font Awesome 6, and Web Audio API**.
-
 ---
 
 ## 1. Overview
