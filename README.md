@@ -173,3 +173,4 @@ index.html
 * **Live Demo:** [Demo網頁連結](https://cheeen712.github.io/HW1_Fitts-Law-HCI-Experiment/)
 
 * **Video:** [Demo影片](https://youtu.be/OCyX2UmX304)
+(點擊下方圖片即可觀看) [![Fitts' Law Experiment Demo](https://img.youtube.com/vi/OCyX2UmX304/maxresdefault.jpg)](https://youtu.be/OCyX2UmX304)
